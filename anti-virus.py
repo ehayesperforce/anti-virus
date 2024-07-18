@@ -1,35 +1,52 @@
-from flask import Flask, request, jsonify
-import os
-import pyclamd
-app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-@app.route('/scan', methods=['POST'])
-def scan_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    if file and allowed_file(file.filename):
-        filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        file.save(filename)
-        # Initialize the ClamAV daemon
-        cd = pyclamd.ClamdNetworkSocket()
-        if not cd.ping():
-            return jsonify({'error': 'ClamAV daemon not available'}), 500
-        scan_result = cd.scan_file(filename)
-        os.remove(filename)
-        if scan_result:
-            return jsonify({'result': 'infected', 'details': scan_result}), 200
-        else:
-            return jsonify({'result': 'clean'}), 200
-    return jsonify({'error': 'File type not allowed'}), 400
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+import base64
+import hmac
+import hashlib
+import json
+
+def base64url_encode(data):
+    return base64.urlsafe_b64encode(data).rstrip(b'=')
+
+def create_jwt(header, payload, secret):
+    encoded_header = base64url_encode(json.dumps(header).encode())
+    encoded_payload = base64url_encode(json.dumps(payload).encode())
+    
+    signature_input = b'.'.join([encoded_header, encoded_payload])
+    signature = hmac.new(secret.encode(), signature_input, hashlib.sha256).digest()
+    encoded_signature = base64url_encode(signature)
+    
+    jwt_token = b'.'.join([encoded_header, encoded_payload, encoded_signature])
+    return jwt_token.decode()
+
+header = {
+    "alg": "HS256",
+    "typ": "JWT"
+{
+  "sub": "marriott_ios",
+  "cts": "OAUTH2_STATELESS_GRANT",
+  "auditTrackingId": "a7fe2d99-1efa-4947-8467-4f785b0309dc-5803436",
+  "subname": "sub",
+  "iss": "akana",
+  "tokenName": "access_token",
+  "token_type": "Bearer",
+  "authGrantId": "uvv84ghoqi5d": [
+    "marriott_ios",
+    "api.marriott.com"
+  ],
+  "nbf": 1720645386,
+  "grant_type": "client_credentials",
+  "scope": [
+    "email",
+   ],
+  "auth_time": 1720645386,
+  "realm": "/Customers",
+  "exp": 1720647186,
+  "iat": 1720645386,
+  "expires_in": 1800,
+  "jti": "LrnhYICSALM87nYZQKyUiypA0YQ",
+  "client_id": "EJH_Akana",
+  "azp": "marriott_ios"
+}
+secret = "password"
+
+jwt_token = create_jwt(header, payload, secret)
+print(jwt_token)
